@@ -49,14 +49,6 @@ instance Monad Haskellish where
     )
 
 
--- this maybe needs a different name?
-join' :: Haskellish (Either String a) -> Haskellish a
-join' x = Haskellish (\e -> do -- in (Either String)
-  x' <- runHaskellish x e
-  x'
-  )
-
-
 identifier :: Haskellish String -- note: we don't distinguish between identifiers and symbols
 identifier = Haskellish f
   where f (Paren _ x) = f x
@@ -141,7 +133,29 @@ collectDoStatements (Do _ xs) = catMaybes $ fmap f xs
 listOfDoStatements :: Haskellish a -> Haskellish [a]
 listOfDoStatements p = Haskellish (\e -> mapM (runHaskellish p) $ collectDoStatements e)
 
-lineAndColumn :: Haskellish (Int,Int)
-lineAndColumn = Haskellish (\e -> do
-  return (0,0)
-  )
+type Span = ((Int,Int),(Int,Int))
+
+askSpan :: Haskellish Span
+askSpan = Haskellish $ return . expToSpan
+
+expToSpan :: Exp SrcSpanInfo -> Span
+expToSpan (Var x _) = srcSpanInfoToSpan x
+expToSpan (Paren x _) = srcSpanInfoToSpan x
+expToSpan (App x _ _) = srcSpanInfoToSpan x
+expToSpan (InfixApp x _ _ _) = srcSpanInfoToSpan x
+expToSpan (LeftSection x _ _) = srcSpanInfoToSpan x
+expToSpan (NegApp x _) = srcSpanInfoToSpan x
+expToSpan (Lit x _) = srcSpanInfoToSpan x
+expToSpan (List x _) = srcSpanInfoToSpan x
+expToSpan (RightSection x _ _) = srcSpanInfoToSpan x
+expToSpan (Tuple x _ _) = srcSpanInfoToSpan x
+expToSpan (Do x _) = srcSpanInfoToSpan x
+expToSpan _ = ((0,0),(0,0))
+
+srcSpanInfoToSpan :: SrcSpanInfo -> Span
+srcSpanInfoToSpan x = ((bx,by),(ex,ey))
+  where
+    bx = srcSpanStartColumn $ srcInfoSpan x
+    by = srcSpanStartLine $ srcInfoSpan x
+    ex = srcSpanEndColumn $ srcInfoSpan x
+    ey = srcSpanEndLine $ srcInfoSpan x

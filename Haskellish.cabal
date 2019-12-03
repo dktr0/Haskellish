@@ -1,5 +1,5 @@
 name:                Haskellish
-version:             0.1.0.0
+version:             0.1.0
 synopsis:
 -- description:
 homepage:            http://github.com/dktr0/Haskellish
@@ -28,8 +28,7 @@ library
   Build-depends:
       base >=4.8 && <5
     , haskell-src-exts >=1.21.1 && <1.22
-    , text < 1.3
-
+    
 source-repository head
   type:     git
   location: https://github.com/dktr0/Haskellish
