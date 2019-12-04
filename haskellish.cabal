@@ -1,7 +1,6 @@
 name:                haskellish
 version:             0.1.0
-synopsis:
--- description:
+synopsis:            For parsing Haskell-ish languages
 homepage:            http://github.com/dktr0/Haskellish
 license:             BSD3
 license-file:        LICENSE
@@ -9,7 +8,7 @@ author:              David Ogborn
 maintainer:          David Ogborn <ogbornd@mcmaster.ca>
 Stability:           Experimental
 Copyright:           (c) 2019- David Ogborn
-Category:
+Category:            Language
 Build-type:          Simple
 cabal-version:       >=1.10
 tested-with:         GHC == 8.6.3
