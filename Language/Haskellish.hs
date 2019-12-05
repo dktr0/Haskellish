@@ -2,6 +2,7 @@ module Language.Haskellish where
 
 import Language.Haskell.Exts
 import Control.Applicative
+import Control.Monad
 import Data.Either (isRight)
 import Data.Maybe (catMaybes)
 
@@ -47,6 +48,10 @@ instance Monad Haskellish where
     x' <- runHaskellish x e
     runHaskellish (f x') e
     )
+
+instance MonadPlus Haskellish where
+  mzero = empty
+  mplus = (<|>)
 
 
 identifier :: Haskellish String -- note: we don't distinguish between identifiers and symbols
@@ -113,9 +118,9 @@ tuple p1 p2 = Haskellish (\e -> do
 asRightSection :: Haskellish (a -> b -> c) -> Haskellish b -> Haskellish (a -> c)
 asRightSection opP bP = Haskellish (\e -> do
   (opExp,bExp) <- f e
-  op <- runHaskellish opP opExp
+  op' <- runHaskellish opP opExp
   b <- runHaskellish bP bExp
-  return $ flip op b
+  return $ flip op' b
   )
   where
     f (Paren _ x) = f x
@@ -129,6 +134,7 @@ collectDoStatements (Do _ xs) = catMaybes $ fmap f xs
   where
     f (Qualifier _ e) = Just e
     f _ = Nothing
+collectDoStatements _ = []
 
 listOfDoStatements :: Haskellish a -> Haskellish [a]
 listOfDoStatements p = Haskellish (\e -> mapM (runHaskellish p) $ collectDoStatements e)
