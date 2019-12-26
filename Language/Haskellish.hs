@@ -165,3 +165,11 @@ srcSpanInfoToSpan x = ((bx,by),(ex,ey))
     by = srcSpanStartLine $ srcInfoSpan x
     ex = srcSpanEndColumn $ srcInfoSpan x
     ey = srcSpanEndLine $ srcInfoSpan x
+
+reverseApplication :: Haskellish (a -> b) -> Haskellish a -> Haskellish b
+reverseApplication x f = Haskellish (\e -> do
+  (e1,e2) <- applicationExpressions e
+  x' <- runHaskellish x e1
+  f' <- runHaskellish f e2
+  return (f' x')
+  )
