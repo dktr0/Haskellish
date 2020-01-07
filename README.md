@@ -9,6 +9,7 @@ with the haskell-src-exts library - a value of type Exp SrcSpanInfo (eg. parsed 
 
 # Version History (changelog)
 
+- 0.2.0 - stateful parsing (and MonadState and MonadError instances)
 - 0.1.2 - added reverseApplication
 - 0.1.1 - added MonadPlus instance
 - 0.1.0 - initial Hackage release
