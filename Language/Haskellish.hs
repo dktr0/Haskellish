@@ -159,6 +159,18 @@ asRightSection opP bP = Haskellish (\st e -> do
     f _ = Left ""
     g l x = (Var l (UnQual l (Ident l x)))
 
+ifThenElse :: Haskellish st a -> Haskellish st b -> Haskellish st c -> Haskellish st (a,b,c)
+ifThenElse aP bP cP = Haskellish (\st e -> do
+  (aExp,bExp,cExp) <- f e
+  (a,st') <- runHaskellish aP st aExp
+  (b,st'') <- runHaskellish bP st' bExp
+  (c,st''') <- runHaskellish cP st'' cExp
+  return ((a,b,c),st''')
+  )
+  where
+    f (Paren _ x) = f x
+    f (If _ x y z) = Right (x,y,z)
+    f _ = Left ""
 
 collectDoStatements :: Exp SrcSpanInfo -> [Exp SrcSpanInfo]
 collectDoStatements (Do _ xs) = catMaybes $ fmap f xs
