@@ -3,9 +3,9 @@
 module Language.Haskellish.TH where
 
 import Language.Haskell.TH
-import Control.Monad
+-- import Control.Monad
 import Data.Map as Map
-import Data.Set as Set
+-- import Data.Set as Set
 
 grabExp :: String -> Q Exp
 grabExp x = varE $ mkName x
@@ -15,8 +15,8 @@ grabExp x = varE $ mkName x
 grabInfoMap :: [String] -> Q (Map String Info)
 grabInfoMap = sequence . Map.fromList . fmap (\x -> (x,reify $ mkName x))
 
-infoToType :: Info -> Type
-infoToType (VarI _ x _) = x
+{- infoToType :: Info -> Type
+infoToType (VarI _ x _) = x -}
 
 -- given a type, return a representation of it as [String] where
 -- concatenating the strings produces a string that could be a legal name for a definition

@@ -69,8 +69,8 @@ instance MonadPlus (Haskellish st) where
 
 
 instance MonadState st (Haskellish st) where
-  get = Haskellish (\st e -> return (st,st))
-  put st = Haskellish (\_ e -> return ((),st))
+  get = Haskellish (\st _ -> return (st,st))
+  put st = Haskellish (\_ _ -> return ((),st))
 
 
 instance MonadError String (Haskellish st) where
@@ -223,4 +223,20 @@ reverseApplication x f = Haskellish (\st e -> do
   (x',st') <- runHaskellish x st e1
   (f',st'') <- runHaskellish f st' e2
   return (f' x',st'')
+  )
+
+-- | binaryApplication targets the specific situation of parsing a function that is applied to two
+-- arguments, given parsers for the function and each of the two arguments. This is intended for rare
+-- cases - in most cases, Haskellish's Applicative instance will be a preferred way of parsing function
+-- application. Unlike the applicative instance, this function returns the three components (function
+-- and two arguments) separately, ie. the function is not actually applied to its arguments in the return type.
+
+binaryApplication :: Haskellish st f -> Haskellish st a -> Haskellish st b -> Haskellish st (f,a,b)
+binaryApplication fP aP bP = Haskellish (\st e -> do
+  (x,bE) <- applicationExpressions e
+  (fE,aE) <- applicationExpressions x
+  (f,st') <- runHaskellish fP st fE
+  (a,st'') <- runHaskellish aP st' aE
+  (b,st''') <- runHaskellish bP st'' bE
+  return ((f,a,b),st''')
   )
