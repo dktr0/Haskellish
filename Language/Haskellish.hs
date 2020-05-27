@@ -240,3 +240,15 @@ binaryApplication fP aP bP = Haskellish (\st e -> do
   (b,st''') <- runHaskellish bP st'' bE
   return ((f,a,b),st''')
   )
+
+-- | functionApplication parses most cases where one thing is applied to another. Like binaryApplication, it is
+-- is intended for rare cases where one wants to match the pattern of one thing being applied to another, without
+-- that application "actually" taking place - the parsed sub-expressions are returned instead.
+
+functionApplication :: Haskellish st a -> Haskellish st b -> Haskellish st (a,b)
+functionApplication fP xP = Haskellish (\st e -> do
+  (fE,xE) <- applicationExpressions e
+  (f,st') <- runHaskellish fP st fE
+  (x,st'') <- runHaskellish xP st' xE
+  return ((f,x),st'')
+  )
