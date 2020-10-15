@@ -9,6 +9,7 @@ with the haskell-src-exts library - a value of type Exp SrcSpanInfo (eg. parsed 
 
 # Version History (changelog)
 
+- 0.2.3.1 - widened bounds on template-haskell dependency
 - 0.2.3 - added functionApplication
 - 0.2.2 - added binaryApplication
 - 0.2.1 - added ifThenElse
