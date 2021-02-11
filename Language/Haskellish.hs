@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.Haskellish where
 
@@ -10,19 +11,55 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.Either (isRight)
 import Data.Maybe (catMaybes)
+import Data.Text (Text)
+import qualified Data.Text as T
 
 
-data Haskellish st a = Haskellish { runHaskellish :: st -> Exp SrcSpanInfo -> Either String (a,st) }
+type Span = ((Int,Int),(Int,Int))
+
+data ParseError = NonFatal Span Text | Fatal Span Text
+
+data Haskellish st a = Haskellish { _run :: st -> Exp SrcSpanInfo -> Either ParseError (a,st) }
+
+runHaskellish :: Haskellish st a -> st -> Exp SrcSpanInfo -> Either (Span,Text) (a,st)
+runHaskellish h st e =
+  case _run h st e of
+    Right (a,s) -> Right (a,s)
+    Left (NonFatal s t) -> Left (s,t)
+    Left (Fatal s t) -> Left (s,t)
+
+parseExp :: Haskellish st a -> st -> Text -> Either (Span,Text) (a,st)
+parseExp h st x = do
+  case Exts.parseExp (T.unpack x) of
+    Exts.ParseOk e -> runHaskellish h st e
+    Exts.ParseFailed loc err -> Left (((a,b),(a,b)),T.pack err)
+      where
+        a = Exts.srcLine loc
+        b = Exts.srcColumn loc
+
 
 exp :: Haskellish st (Exp SrcSpanInfo)
 exp = Haskellish (\st e -> return (e,st))
 
-haskellishError :: String -> Haskellish st a
-haskellishError x = Haskellish (\_ _ -> Left x)
+fatal :: Text -> Haskellish st a
+fatal m = Haskellish (\st e -> Left $ Fatal (expToSpan e) m)
+
+nonFatal :: Text -> Haskellish st a
+nonFatal m = Haskellish (\st e -> Left $ NonFatal (expToSpan e) m)
+
+-- required makes any non-fatal errors into fatal errors
+required :: Haskellish st a -> Haskellish st a
+required h = Haskellish (\st e -> do
+  case _run h st e of
+    Right (a,s) -> Right (a,s)
+    Left (NonFatal s t) -> Left $ Fatal s t
+    Left (Fatal s t) -> Left $ Fatal s t
+  )
+
 
 instance Functor (Haskellish st) where
   fmap f x = Haskellish (\st e -> do
-    (x',st') <- runHaskellish x st e
+    (x',st') <- _run x st e
     Right (f x',st')
     )
 
@@ -31,13 +68,13 @@ instance Applicative (Haskellish st) where
   pure x = Haskellish (\st _ -> Right (x,st))
   f <*> x = Haskellish (\st e -> do
     (e1,e2) <- applicationExpressions e
-    (f',st') <- runHaskellish f st e1
-    (x',st'') <- runHaskellish x st' e2
+    (f',st') <- _run f st e1
+    (x',st'') <- _run  x st' e2
     Right (f' x',st'')
     )
 
 
-applicationExpressions :: Exp SrcSpanInfo -> Either String (Exp SrcSpanInfo,Exp SrcSpanInfo)
+applicationExpressions :: Exp SrcSpanInfo -> Either ParseError (Exp SrcSpanInfo,Exp SrcSpanInfo)
 applicationExpressions (Paren _ x) = applicationExpressions x
 applicationExpressions (App _ e1 e2) = Right (e1,e2)
 applicationExpressions (InfixApp _ e1 (QVarOp _ (UnQual _ (Symbol _ "$"))) e2) = Right (e1,e2)
@@ -45,21 +82,25 @@ applicationExpressions (InfixApp l e1 (QVarOp _ (UnQual _ (Symbol _ x))) e2) = R
   where x' = (Var l (UnQual l (Ident l x)))
 applicationExpressions (LeftSection l e1 (QVarOp _ (UnQual _ (Symbol _ x)))) = Right (x',e1)
   where x' = (Var l (UnQual l (Ident l x)))
-applicationExpressions _ = Left ""
+applicationExpressions e = Left $ NonFatal (expToSpan e) "not an application expresssion"
 
 
 instance Alternative (Haskellish st) where
-  empty = Haskellish (\_ _ -> Left "")
+  empty = Haskellish (\_ e -> Left $ NonFatal (expToSpan e) "")
   a <|> b = Haskellish (\st e -> do
-    let a' = runHaskellish a st e
-    if isRight a' then a' else runHaskellish b st e
+    let a' = _run a st e
+    case a' of
+      Right _ -> a'
+      Left (Fatal _ _) -> a'
+      Left (NonFatal _ _) -> _run b st e
     )
+
 
 
 instance Monad (Haskellish st) where
   x >>= f = Haskellish (\st e -> do
-    (x',st') <- runHaskellish x st e
-    runHaskellish (f x') st' e
+    (x',st') <- _run x st e
+    _run (f x') st' e
     )
 
 
@@ -73,13 +114,14 @@ instance MonadState st (Haskellish st) where
   put st = Haskellish (\_ _ -> return ((),st))
 
 
-instance MonadError String (Haskellish st) where
-  throwError x = Haskellish (\_ _ -> Left x)
+instance MonadError Text (Haskellish st) where
+  throwError x = fatal x
   catchError x f = Haskellish (\st e -> do
-    let x' = runHaskellish x st e
+    let x' = _run x st e
     case x' of
-      Left err -> runHaskellish (f err) st e
       Right (x'',st') -> Right (x'',st')
+      Left (Fatal s err) -> _run (f err) st e
+      Left (NonFatal s err) -> _run (f err) st e
     )
 
 
@@ -88,36 +130,36 @@ identifier = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (Var _ (UnQual _ (Ident _ x))) = Right (x,st)
         f st (Var _ (UnQual _ (Symbol _ x))) = Right (x,st)
-        f _ _ = Left ""
+        f _ e = Left $ NonFatal (expToSpan e) "not identifier"
 
 reserved :: String -> Haskellish st ()
 reserved x = Haskellish (\st e -> do
-   (e',_) <- runHaskellish identifier st e
-   if e' == x then Right ((),st) else Left ""
+   (e',_) <- _run identifier st e
+   if e' == x then Right ((),st) else Left (NonFatal (expToSpan e) "not reserved")
    )
 
 string :: Haskellish st String
 string = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (Lit _ (String _ x _)) = Right (x,st)
-        f _ _ = Left ""
+        f _ e = Left $ NonFatal (expToSpan e) "not string"
 
 integer :: Haskellish st Integer
 integer = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (NegApp _ (Lit _ (Int _ x _))) = Right (x * (-1),st)
         f st (Lit _ (Int _ x _)) = Right (x,st)
-        f _ _ = Left ""
+        f _ e = Left $ NonFatal (expToSpan e) "not integer"
 
 rational :: Haskellish st Rational
 rational = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (NegApp _ (Lit _ (Frac _ x _))) = Right (x * (-1),st)
         f st (Lit _ (Frac _ x _)) = Right (x,st)
-        f _ _ = Left ""
+        f _ e = Left $ NonFatal (expToSpan e) "not rational"
 
 rationalOrInteger :: Haskellish st Rational
-rationalOrInteger = rational <|> fromIntegral <$> integer
+rationalOrInteger = rational <|> (fromIntegral <$> integer) <|> nonFatal "not rationalOrInteger"
 
 list :: Haskellish st a -> Haskellish st [a]
 list p = Haskellish (\st e -> do
@@ -126,51 +168,55 @@ list p = Haskellish (\st e -> do
   )
   where
     f (ys,st) x = do
-      (y,st') <- runHaskellish p st x
+      (y,st') <- _run p st x
       return (ys ++ [y],st')
 
-listExpressions :: Exp SrcSpanInfo -> Either String [Exp SrcSpanInfo]
+listExpressions :: Exp SrcSpanInfo -> Either ParseError [Exp SrcSpanInfo]
 listExpressions (Paren _ x) = listExpressions x
 listExpressions (List _ xs) = Right xs
-listExpressions _ = Left ""
+listExpressions e = Left $ NonFatal (expToSpan e) "not a list"
 
 tuple :: Haskellish st a -> Haskellish st b -> Haskellish st (a,b)
 tuple p1 p2 = Haskellish (\st e -> do
   (a,b) <- f e
-  (a',st') <- runHaskellish p1 st a
-  (b',st'') <- runHaskellish p2 st' b
+  (a',st') <- _run p1 st a
+  (b',st'') <- _run p2 st' b
   return ((a',b'),st'')
   )
   where
     f (Paren _ x) = f x
     f (Tuple _ Boxed (a:b:[])) = Right (a,b)
-    f _ = Left ""
+    f e = Left $ NonFatal (expToSpan e) "not a tuple"
 
 asRightSection :: Haskellish st (a -> b -> c) -> Haskellish st b -> Haskellish st (a -> c)
 asRightSection opP bP = Haskellish (\st e -> do
   (opExp,bExp) <- f e
-  (op',st') <- runHaskellish opP st opExp
-  (b,st'') <- runHaskellish bP st' bExp
+  (op',st') <- _run opP st opExp
+  (b,st'') <- _run bP st' bExp
   return (flip op' b,st'')
   )
   where
     f (Paren _ x) = f x
     f (RightSection _ (QVarOp l (UnQual _ (Symbol _ x))) e1) = Right (g l x,e1)
-    f _ = Left ""
+    f e = Left $ NonFatal (expToSpan e) "not a right section"
     g l x = (Var l (UnQual l (Ident l x)))
 
 ifThenElse :: Haskellish st a -> Haskellish st b -> Haskellish st c -> Haskellish st (a,b,c)
 ifThenElse aP bP cP = Haskellish (\st e -> do
   (aExp,bExp,cExp) <- f e
-  (a,st') <- runHaskellish aP st aExp
-  (b,st'') <- runHaskellish bP st' bExp
-  (c,st''') <- runHaskellish cP st'' cExp
+  (a,st') <- _run aP st aExp
+  (b,st'') <- _run bP st' bExp
+  (c,st''') <- _run cP st'' cExp
   return ((a,b,c),st''')
   )
   where
     f (Paren _ x) = f x
     f (If _ x y z) = Right (x,y,z)
-    f _ = Left ""
+    f e = Left $ NonFatal (expToSpan e) "not an if-then-else"
+
+
+-- *** TODO: the relationship of collectDoStatement and listOfDoStatements to
+-- error handling needs to be thought through....
 
 collectDoStatements :: Exp SrcSpanInfo -> [Exp SrcSpanInfo]
 collectDoStatements (Do _ xs) = catMaybes $ fmap f xs
@@ -186,11 +232,10 @@ listOfDoStatements p = Haskellish (\st e -> do
   )
   where
     f (ys,st) x = do
-      (y,st') <- runHaskellish p st x
+      (y,st') <- _run p st x
       return (ys ++ [y],st')
 
 
-type Span = ((Int,Int),(Int,Int))
 
 span :: Haskellish st Span
 span = Haskellish (\st e -> return (expToSpan e,st))
@@ -220,8 +265,8 @@ srcSpanInfoToSpan x = ((bx,by),(ex,ey))
 reverseApplication :: Haskellish st a -> Haskellish st (a -> b) -> Haskellish st b
 reverseApplication x f = Haskellish (\st e -> do
   (e1,e2) <- applicationExpressions e
-  (x',st') <- runHaskellish x st e1
-  (f',st'') <- runHaskellish f st' e2
+  (x',st') <- _run x st e1
+  (f',st'') <- _run f st' e2
   return (f' x',st'')
   )
 
@@ -235,9 +280,9 @@ binaryApplication :: Haskellish st f -> Haskellish st a -> Haskellish st b -> Ha
 binaryApplication fP aP bP = Haskellish (\st e -> do
   (x,bE) <- applicationExpressions e
   (fE,aE) <- applicationExpressions x
-  (f,st') <- runHaskellish fP st fE
-  (a,st'') <- runHaskellish aP st' aE
-  (b,st''') <- runHaskellish bP st'' bE
+  (f,st') <- _run fP st fE
+  (a,st'') <- _run aP st' aE
+  (b,st''') <- _run bP st'' bE
   return ((f,a,b),st''')
   )
 
@@ -248,7 +293,7 @@ binaryApplication fP aP bP = Haskellish (\st e -> do
 functionApplication :: Haskellish st a -> Haskellish st b -> Haskellish st (a,b)
 functionApplication fP xP = Haskellish (\st e -> do
   (fE,xE) <- applicationExpressions e
-  (f,st') <- runHaskellish fP st fE
-  (x,st'') <- runHaskellish xP st' xE
+  (f,st') <- _run fP st fE
+  (x,st'') <- _run xP st' xE
   return ((f,x),st'')
   )
