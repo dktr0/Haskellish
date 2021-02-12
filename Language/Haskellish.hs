@@ -31,12 +31,12 @@ runHaskellish h st e =
     Left (NonFatal ((a,b),_) t) -> Left $ show a ++ ":" ++ show b ++ " " ++ T.unpack t
     Left (Fatal ((a,b),_) t) -> Left $ show a ++ ":" ++ show b ++ " " ++ T.unpack t
 
--- parseExp replaces runHaskellish and is intended as the main top-level entry point for
+-- parseHaskellish replaces runHaskellish and is intended as the main top-level entry point for
 -- running a Haskellish parser. It uses haskell-src-exts to parse Text into a Haskell AST
 -- that is then parsed by the Haskellish parser.
 
-parseExp :: Haskellish st a -> st -> Text -> Either (Span,Text) (a,st)
-parseExp h st x = do
+parseHaskellish :: Haskellish st a -> st -> Text -> Either (Span,Text) (a,st)
+parseHaskellish h st x = do
   case Exts.parseExp (T.unpack x) of
     Exts.ParseOk e -> do
       case _run h st e of
