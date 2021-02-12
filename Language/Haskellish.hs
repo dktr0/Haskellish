@@ -107,7 +107,7 @@ applicationExpressions (InfixApp l e1 (QVarOp _ (UnQual _ (Symbol _ x))) e2) = R
   where x' = (Var l (UnQual l (Ident l x)))
 applicationExpressions (LeftSection l e1 (QVarOp _ (UnQual _ (Symbol _ x)))) = Right (x',e1)
   where x' = (Var l (UnQual l (Ident l x)))
-applicationExpressions e = Left $ NonFatal (expToSpan e) "not an application expresssion"
+applicationExpressions e = Left $ NonFatal (expToSpan e) "expected application expresssion"
 
 
 instance Alternative (Haskellish st) where
@@ -155,36 +155,36 @@ identifier = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (Var _ (UnQual _ (Ident _ x))) = Right (x,st)
         f st (Var _ (UnQual _ (Symbol _ x))) = Right (x,st)
-        f _ e = Left $ NonFatal (expToSpan e) "not identifier"
+        f _ e = Left $ NonFatal (expToSpan e) "expected identifier"
 
 reserved :: String -> Haskellish st ()
 reserved x = Haskellish (\st e -> do
    (e',_) <- _run identifier st e
-   if e' == x then Right ((),st) else Left (NonFatal (expToSpan e) "not reserved")
+   if e' == x then Right ((),st) else Left (NonFatal (expToSpan e) "expected reserved word")
    )
 
 string :: Haskellish st String
 string = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (Lit _ (String _ x _)) = Right (x,st)
-        f _ e = Left $ NonFatal (expToSpan e) "not string"
+        f _ e = Left $ NonFatal (expToSpan e) "expected literal String"
 
 integer :: Haskellish st Integer
 integer = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (NegApp _ (Lit _ (Int _ x _))) = Right (x * (-1),st)
         f st (Lit _ (Int _ x _)) = Right (x,st)
-        f _ e = Left $ NonFatal (expToSpan e) "not integer"
+        f _ e = Left $ NonFatal (expToSpan e) "expected Integer"
 
 rational :: Haskellish st Rational
 rational = Haskellish (\st e -> f st e)
   where f st (Paren _ x) = f st x
         f st (NegApp _ (Lit _ (Frac _ x _))) = Right (x * (-1),st)
         f st (Lit _ (Frac _ x _)) = Right (x,st)
-        f _ e = Left $ NonFatal (expToSpan e) "not rational"
+        f _ e = Left $ NonFatal (expToSpan e) "expected Rational"
 
 rationalOrInteger :: Haskellish st Rational
-rationalOrInteger = rational <|> (fromIntegral <$> integer) <|> nonFatal "not rationalOrInteger"
+rationalOrInteger = rational <|> (fromIntegral <$> integer) <|> nonFatal "expected Rational or Integer"
 
 list :: Haskellish st a -> Haskellish st [a]
 list p = Haskellish (\st e -> do
@@ -199,7 +199,7 @@ list p = Haskellish (\st e -> do
 listExpressions :: Exp SrcSpanInfo -> Either ParseError [Exp SrcSpanInfo]
 listExpressions (Paren _ x) = listExpressions x
 listExpressions (List _ xs) = Right xs
-listExpressions e = Left $ NonFatal (expToSpan e) "not a list"
+listExpressions e = Left $ NonFatal (expToSpan e) "expected list"
 
 tuple :: Haskellish st a -> Haskellish st b -> Haskellish st (a,b)
 tuple p1 p2 = Haskellish (\st e -> do
@@ -211,7 +211,7 @@ tuple p1 p2 = Haskellish (\st e -> do
   where
     f (Paren _ x) = f x
     f (Tuple _ Boxed (a:b:[])) = Right (a,b)
-    f e = Left $ NonFatal (expToSpan e) "not a tuple"
+    f e = Left $ NonFatal (expToSpan e) "expected tuple"
 
 asRightSection :: Haskellish st (a -> b -> c) -> Haskellish st b -> Haskellish st (a -> c)
 asRightSection opP bP = Haskellish (\st e -> do
@@ -223,7 +223,7 @@ asRightSection opP bP = Haskellish (\st e -> do
   where
     f (Paren _ x) = f x
     f (RightSection _ (QVarOp l (UnQual _ (Symbol _ x))) e1) = Right (g l x,e1)
-    f e = Left $ NonFatal (expToSpan e) "not a right section"
+    f e = Left $ NonFatal (expToSpan e) "expected right section"
     g l x = (Var l (UnQual l (Ident l x)))
 
 ifThenElse :: Haskellish st a -> Haskellish st b -> Haskellish st c -> Haskellish st (a,b,c)
@@ -237,7 +237,7 @@ ifThenElse aP bP cP = Haskellish (\st e -> do
   where
     f (Paren _ x) = f x
     f (If _ x y z) = Right (x,y,z)
-    f e = Left $ NonFatal (expToSpan e) "not an if-then-else"
+    f e = Left $ NonFatal (expToSpan e) "expected if-then-else"
 
 
 -- *** TODO: the relationship of collectDoStatement and listOfDoStatements to
