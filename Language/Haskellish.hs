@@ -58,6 +58,12 @@ fatal m = Haskellish (\st e -> Left $ Fatal (expToSpan e) m)
 nonFatal :: Text -> Haskellish st a
 nonFatal m = Haskellish (\st e -> Left $ NonFatal (expToSpan e) m)
 
+(<?>) :: Haskellish st a -> Text -> Haskellish st a
+h <?> msg = h <|> nonFatal msg
+
+(<?!>) :: Haskellish st a -> Text -> Haskellish st a
+h <?!> msg = h <|> fatal msg
+
 -- required makes any non-fatal errors into fatal errors
 
 required :: Haskellish st a -> Haskellish st a
