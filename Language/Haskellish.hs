@@ -21,7 +21,7 @@ data ParseError = NonFatal Span Text | Fatal Span Text
 
 data Haskellish st a = Haskellish { _run :: st -> Exp SrcSpanInfo -> Either ParseError (a,st) }
 
--- runHaskellish, introduced in this form in 0.2.4 and considered *deprecated* in favour of parseExp
+-- runHaskellish, introduced in this form in 0.2.4 and considered *deprecated* in favour of parseAndRun
 -- is primarily meant to avoid breaking changes with projects built against 0.2.3 and earlier
 
 runHaskellish :: Haskellish st a -> st -> Exp SrcSpanInfo -> Either String (a,st)
@@ -31,12 +31,12 @@ runHaskellish h st e =
     Left (NonFatal ((a,b),_) t) -> Left $ show a ++ ":" ++ show b ++ " " ++ T.unpack t
     Left (Fatal ((a,b),_) t) -> Left $ show a ++ ":" ++ show b ++ " " ++ T.unpack t
 
--- parseHaskellish replaces runHaskellish and is intended as the main top-level entry point for
+-- parseAndRun replaces runHaskellish and is intended as the main top-level entry point for
 -- running a Haskellish parser. It uses haskell-src-exts to parse Text into a Haskell AST
 -- that is then parsed by the Haskellish parser.
 
-parseHaskellish :: Haskellish st a -> st -> Text -> Either (Span,Text) (a,st)
-parseHaskellish h st x = do
+parseAndRun :: Haskellish st a -> st -> Text -> Either (Span,Text) (a,st)
+parseAndRun h st x = do
   case Exts.parseExp (T.unpack x) of
     Exts.ParseOk e -> do
       case _run h st e of
