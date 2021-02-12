@@ -9,7 +9,7 @@ with the haskell-src-exts library - a value of type Exp SrcSpanInfo (eg. parsed 
 
 # Version History (changelog)
 
-- 0.3.0 - modified error-handling to distinguish fatal and non-fatal cases
+- 0.2.4 - modified error-handling to distinguish fatal and non-fatal cases
 - 0.2.3.1 - widened bounds on template-haskell dependency
 - 0.2.3 - added functionApplication
 - 0.2.2 - added binaryApplication

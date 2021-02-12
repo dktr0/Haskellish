@@ -21,17 +21,28 @@ data ParseError = NonFatal Span Text | Fatal Span Text
 
 data Haskellish st a = Haskellish { _run :: st -> Exp SrcSpanInfo -> Either ParseError (a,st) }
 
-runHaskellish :: Haskellish st a -> st -> Exp SrcSpanInfo -> Either (Span,Text) (a,st)
+-- runHaskellish, introduced in this form in 0.2.4 and considered *deprecated* in favour of parseExp
+-- is primarily meant to avoid breaking changes with projects built against 0.2.3 and earlier
+
+runHaskellish :: Haskellish st a -> st -> Exp SrcSpanInfo -> Either String (a,st)
 runHaskellish h st e =
   case _run h st e of
     Right (a,s) -> Right (a,s)
-    Left (NonFatal s t) -> Left (s,t)
-    Left (Fatal s t) -> Left (s,t)
+    Left (NonFatal ((a,b),_) t) -> Left $ show a ++ ":" ++ show b ++ " " ++ T.unpack t
+    Left (Fatal ((a,b),_) t) -> Left $ show a ++ ":" ++ show b ++ " " ++ T.unpack t
+
+-- parseExp replaces runHaskellish and is intended as the main top-level entry point for
+-- running a Haskellish parser. It uses haskell-src-exts to parse Text into a Haskell AST
+-- that is then parsed by the Haskellish parser.
 
 parseExp :: Haskellish st a -> st -> Text -> Either (Span,Text) (a,st)
 parseExp h st x = do
   case Exts.parseExp (T.unpack x) of
-    Exts.ParseOk e -> runHaskellish h st e
+    Exts.ParseOk e -> do
+      case _run h st e of
+        Right (a,st) -> Right (a,st)
+        Left (NonFatal s t) -> Left (s,t)
+        Left (Fatal s t) -> Left (s,t)
     Exts.ParseFailed loc err -> Left (((a,b),(a,b)),T.pack err)
       where
         a = Exts.srcLine loc
@@ -48,6 +59,7 @@ nonFatal :: Text -> Haskellish st a
 nonFatal m = Haskellish (\st e -> Left $ NonFatal (expToSpan e) m)
 
 -- required makes any non-fatal errors into fatal errors
+
 required :: Haskellish st a -> Haskellish st a
 required h = Haskellish (\st e -> do
   case _run h st e of
@@ -55,6 +67,12 @@ required h = Haskellish (\st e -> do
     Left (NonFatal s t) -> Left $ Fatal s t
     Left (Fatal s t) -> Left $ Fatal s t
   )
+
+-- <*!> is a variant of the applicative <*> operator where the argument on the right
+-- is implicitly wrapped in 'required' (see above)
+
+(<*!>) :: Haskellish st (a -> b) -> Haskellish st a -> Haskellish st b
+f <*!> x = f <*> required x
 
 
 instance Functor (Haskellish st) where
@@ -72,6 +90,7 @@ instance Applicative (Haskellish st) where
     (x',st'') <- _run  x st' e2
     Right (f' x',st'')
     )
+
 
 
 applicationExpressions :: Exp SrcSpanInfo -> Either ParseError (Exp SrcSpanInfo,Exp SrcSpanInfo)
@@ -255,7 +274,7 @@ expToSpan (Do x _) = srcSpanInfoToSpan x
 expToSpan _ = ((0,0),(0,0))
 
 srcSpanInfoToSpan :: SrcSpanInfo -> Span
-srcSpanInfoToSpan x = ((bx,by),(ex,ey))
+srcSpanInfoToSpan x = ((by,bx),(ey,ex))
   where
     bx = srcSpanStartColumn $ srcInfoSpan x
     by = srcSpanStartLine $ srcInfoSpan x
