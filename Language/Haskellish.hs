@@ -35,9 +35,9 @@ runHaskellish h st e =
 -- running a Haskellish parser. It uses haskell-src-exts to parse Text into a Haskell AST
 -- that is then parsed by the Haskellish parser.
 
-parseAndRun :: Haskellish st a -> st -> Text -> Either (Span,Text) (a,st)
+parseAndRun :: Haskellish st a -> st -> String -> Either (Span,Text) (a,st)
 parseAndRun h st x = do
-  case Exts.parseExp (T.unpack x) of
+  case Exts.parseExp x of
     Exts.ParseOk e -> do
       case _run h st e of
         Right (a,st) -> Right (a,st)
@@ -47,6 +47,43 @@ parseAndRun h st x = do
       where
         a = Exts.srcLine loc
         b = Exts.srcColumn loc
+
+
+-- removing Haskell comments (while preserving document/newlines structure) before
+-- asking haskell-src-exts to parse the Haskell AST simplifies some applications
+-- where haskellish is used in ways that don't quite conform to the full Haskell
+-- syntax rules. 'removeComments' can be used ahead of parseAndRun for this purpose
+
+-- 1. default is we are not in a comment or a string
+removeComments :: String -> String
+removeComments [] = []
+removeComments ('-':'-':xs) = removeCommentsSingleLine xs
+removeComments ('{':'-':xs) = "  " ++ removeCommentsMultiLine xs
+removeComments ('\"':xs) = '\"' : removeCommentsLiteralString xs
+removeComments (x:xs) = x : removeComments xs
+
+-- 2. if we are in a single-line comment, then we throw away characters until the next new line, which we keep
+removeCommentsSingleLine :: String -> String
+removeCommentsSingleLine [] = []
+removeCommentsSingleLine ('\n':xs) = '\n' : removeComments xs
+removeCommentsSingleLine (_:xs) = removeCommentsSingleLine xs
+
+-- 3. if we are in a multi-line comment, then we replace characters (except newlines) with spaces until we get the terminator
+-- (we replace with spaces, instead of throwing away, to preserve the line structure in lines that contain the terminator)
+removeCommentsMultiLine :: String -> String
+removeCommentsMultiLine [] = []
+removeCommentsMultiLine ('\n':xs) = '\n' : removeCommentsMultiLine xs
+removeCommentsMultiLine ('-':'}':xs) = "  " ++ removeComments xs
+removeCommentsMultiLine (_:xs) = ' ' : removeCommentsMultiLine xs
+
+-- 4. if we are in a literal string, then we are in a literal string until the string is terminated
+-- (note: this implementation does not currently support Haskell multi-line strings and may not accurately
+-- reflect what is supposed to happen if a literal string is not appropriately terminated within a given line.)
+removeCommentsLiteralString :: String -> String
+removeCommentsLiteralString [] = []
+removeCommentsLiteralString ('\\':'"':xs) = "\"" ++ removeCommentsLiteralString xs
+removeCommentsLiteralString ('"':xs) = '"' : removeComments xs
+removeCommentsLiteralString (x:xs) = x : removeCommentsLiteralString xs
 
 
 exp :: Haskellish st (Exp SrcSpanInfo)
