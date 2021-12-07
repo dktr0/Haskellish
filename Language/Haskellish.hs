@@ -361,7 +361,7 @@ functionApplication fP xP = Haskellish (\st e -> do
   )
 
 
--- enumFromTo matches anything with the following form: [a..b]
+-- | enumFromTo matches anything with the following form: [a..b]
 
 enumFromTo :: Haskellish st a -> Haskellish st b -> Haskellish st (a,b)
 enumFromTo aP bP = Haskellish (\st e -> do
@@ -373,3 +373,18 @@ enumFromTo aP bP = Haskellish (\st e -> do
   where
     f (EnumFromTo _ aE bE) = Right (aE,bE)
     f e = Left $ NonFatal (expToSpan e) "expected application enumFromTo"
+
+
+-- | enumFromThenTo matches anything with theform [a,b..c]
+
+enumFromThenTo :: Haskellish st a -> Haskellish st b -> Haskellish st c -> Haskellish st (a,b,c)
+enumFromThenTo aP bP cP = Haskellish (\st e -> do
+  (aE,bE,cE) <- f e
+  (a,st') <- _run aP st aE
+  (b,st'') <- _run bP st' bE
+  (c,st''') <- _run cP st'' cE
+  return ((a,b,c),st''')
+  )
+  where
+    f (EnumFromThenTo _ aE bE cE) = Right (aE,bE,cE)
+    f e = Left $ NonFatal (expToSpan e) "expected application enumFromThenTo"

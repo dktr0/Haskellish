@@ -8,7 +8,7 @@ such a tree to particular results. Haskellish parsers are Functor, Applicative, 
 
 # Version History (changelog)
 
-- 0.3.1 - added enumFromTo
+- 0.3.1 - added enumFromTo and enumFromThenTo
 - 0.3 - added 'removeComments'; parseAndRun takes String instead of Text
 - 0.2.4.3 - widened bounds on template-haskell dependency
 - 0.2.4.2 - widened bounds on haskell-src-exts dependency
