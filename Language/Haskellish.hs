@@ -359,3 +359,17 @@ functionApplication fP xP = Haskellish (\st e -> do
   (x,st'') <- _run xP st' xE
   return ((f,x),st'')
   )
+
+
+-- enumFromTo matches anything with the following form: [a..b]
+
+enumFromTo :: Haskellish st a -> Haskellish st b -> Haskellish st (a,b)
+enumFromTo aP bP = Haskellish (\st e -> do
+  (aE,bE) <- f e
+  (a,st') <- _run aP st aE
+  (b,st'') <- _run bP st' bE
+  return ((a,b),st'')
+  )
+  where
+    f (EnumFromTo _ aE bE) = Right (aE,bE)
+    f e = Left $ NonFatal (expToSpan e) "expected application enumFromTo"
