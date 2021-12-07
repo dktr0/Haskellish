@@ -36,8 +36,11 @@ runHaskellish h st e =
 -- that is then parsed by the Haskellish parser.
 
 parseAndRun :: Haskellish st a -> st -> String -> Either (Span,Text) (a,st)
-parseAndRun h st x = do
-  case Exts.parseExp x of
+parseAndRun = parseWithModeAndRun Exts.defaultParseMode
+
+parseWithModeAndRun :: Exts.ParseMode -> Haskellish st a -> st -> String -> Either (Span,Text) (a,st)
+parseWithModeAndRun m h st x = do
+  case Exts.parseWithMode m x of
     Exts.ParseOk e -> do
       case _run h st e of
         Right (a,st) -> Right (a,st)
