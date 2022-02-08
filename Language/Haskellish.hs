@@ -197,6 +197,15 @@ identifier = Haskellish (\st e -> f st e)
         f st (Var _ (UnQual _ (Symbol _ x))) = Right (x,st)
         f _ e = Left $ NonFatal (expToSpan e) "expected identifier"
 
+trueOrFalse :: Haskellish st Bool
+trueOrFalse = Haskellish (\st e -> f st e)
+  where
+    f st (Paren _ x) = f st x
+    f st (Con _ (UnQual _ (Ident _ "True"))) = Right (True,st)
+    f st (Con _ (UnQual _ (Ident _ "False"))) = Right (False,st)
+    f _ e = Left $ NonFatal (expToSpan e) "expected bool"
+
+
 reserved :: String -> Haskellish st ()
 reserved x = Haskellish (\st e -> do
    (e',_) <- _run identifier st e
