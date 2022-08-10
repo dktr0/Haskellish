@@ -8,6 +8,7 @@ such a tree to particular results. Haskellish parsers are Functor, Applicative, 
 
 # Version History (changelog)
 
+- 0.3.2.1 - widened bounds on template-haskell dependency
 - 0.3.2 - added trueOrFalse for parsing True/False "literals" (constructors, actually)
 - 0.3.1 - added enumFromTo, enumFromThenTo, parseWithModeAndRun
 - 0.3 - added 'removeComments'; parseAndRun takes String instead of Text
