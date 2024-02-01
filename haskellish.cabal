@@ -1,5 +1,5 @@
 name:                haskellish
-version:             0.3.2.1
+version:             0.3.2.2
 synopsis:            For parsing Haskell-ish languages
 homepage:            http://github.com/dktr0/Haskellish
 license:             BSD3
@@ -29,8 +29,8 @@ library
   Build-depends:
       base >=4.8 && <5
     , haskell-src-exts >=1.17.1 && <1.24
-    , mtl >= 2.2.2 && <2.3
-    , template-haskell >= 2.10.0.0 && < 2.20
+    , mtl >= 2.2.2 && <2.4
+    , template-haskell >= 2.10.0.0 && < 2.21
     , containers < 0.7
     , text < 2.1
 
