@@ -9,7 +9,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
-import Data.Either (isRight)
+-- import Data.Either (isRight)
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -43,13 +43,13 @@ parseWithModeAndRun m h st x = do
   case Exts.parseWithMode m x of
     Exts.ParseOk e -> do
       case _run h st e of
-        Right (a,st) -> Right (a,st)
+        Right (a,st') -> Right (a,st')
         Left (NonFatal s t) -> Left (s,t)
         Left (Fatal s t) -> Left (s,t)
-    Exts.ParseFailed loc err -> Left (((a,b),(a,b)),T.pack err)
+    Exts.ParseFailed loc' err -> Left (((a,b),(a,b)),T.pack err)
       where
-        a = Exts.srcLine loc
-        b = Exts.srcColumn loc
+        a = Exts.srcLine loc'
+        b = Exts.srcColumn loc'
 
 
 -- removing Haskell comments (while preserving document/newlines structure) before
@@ -93,10 +93,10 @@ exp :: Haskellish st (Exp SrcSpanInfo)
 exp = Haskellish (\st e -> return (e,st))
 
 fatal :: Text -> Haskellish st a
-fatal m = Haskellish (\st e -> Left $ Fatal (expToSpan e) m)
+fatal m = Haskellish (\_ e -> Left $ Fatal (expToSpan e) m)
 
 nonFatal :: Text -> Haskellish st a
-nonFatal m = Haskellish (\st e -> Left $ NonFatal (expToSpan e) m)
+nonFatal m = Haskellish (\_ e -> Left $ NonFatal (expToSpan e) m)
 
 (<?>) :: Haskellish st a -> Text -> Haskellish st a
 h <?> msg = h <|> nonFatal msg
@@ -185,8 +185,8 @@ instance MonadError Text (Haskellish st) where
     let x' = _run x st e
     case x' of
       Right (x'',st') -> Right (x'',st')
-      Left (Fatal s err) -> _run (f err) st e
-      Left (NonFatal s err) -> _run (f err) st e
+      Left (Fatal _ err) -> _run (f err) st e
+      Left (NonFatal _ err) -> _run (f err) st e
     )
 
 
