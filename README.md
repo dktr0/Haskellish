@@ -8,6 +8,7 @@ such a tree to particular results. Haskellish parsers are Functor, Applicative, 
 
 # Version History (changelog)
 
+- 0.3.2.4 - widened bounds on template-haskell
 - 0.3.2.3 - widened bounds on template-haskell (will build with LTS 22.17)
 - 0.3.2.2 - widened bounds on template-haskell and mtl dependencies (will build with LTS 22.8)
 - 0.3.2.1 - widened bounds on template-haskell dependency
